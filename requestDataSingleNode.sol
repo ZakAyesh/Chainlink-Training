@@ -2,33 +2,44 @@ pragma solidity ^0.6.0;
 
 import "github.com/smartcontractkit/chainlink/evm-contracts/src/v0.6/ChainlinkClient.sol";
 
-contract ChainlinkExample is ChainlinkClient {
-    uint256 public currentPrice;
-    address public owner;
-    address public ORACLE_ADDRESS = 0xB36d3709e22F7c708348E225b20b13eA546E6D9c;
-    bytes32 constant JOBID = "628eded7db7f4f799dbf69538dec7ff2";
-    uint256 constant private ORACLE_PAYMENT = 100000000000000000;
+contract CoinGeckoConsumer is ChainlinkClient {
+    address private oracle;
+    bytes32 private jobId;
+    uint256 private fee;
     
+    uint256 public ethereumPrice;
+    
+    /**
+     * Network: Kovan
+     * Oracle: 
+     *      Name:           AlphaChain Kovan
+     *      Listing URL:    https://market.link/nodes/ef076e87-49f4-486b-9878-c4806781c7a0?start=1601380594&end=1601985394
+     *      Address:        0xAA1DC356dc4B18f30C347798FD5379F3D77ABC5b
+     * Job: 
+     *      Name:           ETH-USD CoinGecko
+     *      Listing URL:    https://market.link/jobs/78868caf-4a75-4dbf-a4cf-52538a283409
+     *      ID:             9cc0c77e8e6e4f348ef5ba03c636f1f7
+     *      Fee:            0.1 LINK
+     */
     constructor() public {
         setPublicChainlinkToken();
-        owner = msg.sender;
+        oracle = 0xAA1DC356dc4B18f30C347798FD5379F3D77ABC5b; // oracle address
+        jobId = "9cc0c77e8e6e4f348ef5ba03c636f1f7"; //job id
+        fee = 0.1 * 10 ** 18; // 0.1 LINK
     }
     
-    function requestEthereumPrice() public onlyOwner {
-        Chainlink.Request memory req = buildChainlinkRequest(JOBID, address(this), this.fulfill.selector);
-        req.add("get", "https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD");
-        req.add("path", "USD");
-        req.addInt("times", 100);
-        sendChainlinkRequestTo(ORACLE_ADDRESS, req, ORACLE_PAYMENT);
+    /**
+     * Make initial request
+     */
+    function requestEthereumPrice() public {
+        Chainlink.Request memory req = buildChainlinkRequest(jobId, address(this), this.fulfillEthereumPrice.selector);
+        sendChainlinkRequestTo(oracle, req, fee);
     }
     
-    function fulfill(bytes32 _requestId, uint256 _price) public 
-    recordChainlinkFulfillment(_requestId) {
-        currentPrice = _price;
-    }
-    
-    modifier onlyOwner() {
-        require(msg.sender == owner);
-        _;
+    /**
+     * Callback function
+     */
+    function fulfillEthereumPrice(bytes32 _requestId, uint256 _price) public recordChainlinkFulfillment(_requestId) {
+        ethereumPrice = _price;
     }
 }
